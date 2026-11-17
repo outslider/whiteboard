@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ITホワイトボード</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='4' width='28' height='22' rx='3' fill='%231c7ed6'/%3E%3Cpath d='M8 18l6-6 4 4 6-6' stroke='white' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f8f9fa; --panel:#fff; --line:#dee2e6; --text:#212529; --muted:#868e96; --accent:#1c7ed6; --accent-l:#e7f5ff;
+  --shadow:0 2px 10px rgba(0,0,0,.10),0 0 1px rgba(0,0,0,.2);
+  --ui-font:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;font-family:var(--ui-font);font-size:13px;color:var(--text);background:var(--bg)}
+button{font:inherit;color:inherit;cursor:pointer}
+input,select{font:inherit}
+.hidden{display:none!important}
+
+/* ---------- board list ---------- */
+#home{position:fixed;inset:0;overflow:auto;background:#f1f3f5}
+#home .wrap{max-width:1100px;margin:0 auto;padding:32px 24px}
+#home h1{font-size:22px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+#home .sub{color:var(--muted);margin-bottom:20px}
+#home .actions{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 14px;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:#f1f3f5}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:#1971c2}
+.btn.danger{color:#e03131}
+.btn.sm{padding:4px 10px;font-size:12px}
+#boardGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.bcard{background:#fff;border-radius:10px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+.bcard .thumb{height:130px;background:#fff;border-bottom:1px solid var(--line);cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.bcard .thumb svg{width:100%;height:100%}
+.bcard .meta{padding:10px 12px}
+.bcard .name{font-weight:600;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bcard .info{color:var(--muted);font-size:11px;margin-top:3px}
+.bcard .ops{display:flex;gap:4px;margin-top:8px}
+.online{color:#2f9e44;font-weight:600}
+
+/* ---------- app ---------- */
+#app{position:fixed;inset:0}
+#stage{position:absolute;inset:0;overflow:hidden;touch-action:none;background-color:#fff}
+#stage.grid{background-image:radial-gradient(circle,#ced4da 1px,transparent 1.2px)}
+#svg{position:absolute;inset:0;width:100%;height:100%;display:block;user-select:none;-webkit-user-select:none}
+#stage.tool-hand,#stage.panning{cursor:grab}
+#stage.panning:active{cursor:grabbing}
+#stage.tool-pen,#stage.tool-rect,#stage.tool-ellipse,#stage.tool-diamond,#stage.tool-line,#stage.tool-arrow,#stage.tool-sticky,#stage.tool-frame,#stage.tool-place{cursor:crosshair}
+#stage.tool-text{cursor:text}
+#stage.tool-eraser{cursor:cell}
+.el-hit{cursor:move}
+.handle{cursor:pointer}
+
+.float{position:absolute;background:var(--panel);border-radius:10px;box-shadow:var(--shadow);z-index:10}
+#topLeft{left:12px;top:12px;display:flex;align-items:center;gap:6px;padding:6px 8px}
+#topLeft .home{border:none;background:none;padding:4px 6px;border-radius:6px;display:flex}
+#topLeft .home:hover{background:#f1f3f5}
+#boardName{border:1px solid transparent;border-radius:6px;padding:4px 6px;font-weight:600;font-size:14px;width:220px;background:transparent}
+#boardName:hover{border-color:var(--line)}
+#boardName:focus{border-color:var(--accent);outline:none;background:#fff}
+#saveState{font-size:11px;color:var(--muted);white-space:nowrap;min-width:90px}
+#saveState.err{color:#e03131}
+
+#toolbar{left:50%;top:12px;transform:translateX(-50%);display:flex;gap:2px;padding:5px}
+.tb{width:36px;height:36px;border:none;background:none;border-radius:7px;display:flex;align-items:center;justify-content:center;position:relative}
+.tb:hover{background:#f1f3f5}
+.tb.on{background:var(--accent-l);color:var(--accent)}
+.tb svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tb .k{position:absolute;right:3px;bottom:1px;font-size:8px;color:var(--muted)}
+.sep{width:1px;background:var(--line);margin:4px 3px}
+
+#topRight{right:12px;top:12px;display:flex;align-items:center;gap:6px;padding:6px 8px}
+#peers{display:flex;align-items:center}
+.avatar{width:28px;height:28px;border-radius:50%;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;margin-left:-6px;cursor:default}
+.avatar.me{outline:2px solid var(--accent);outline-offset:-1px}
+#connDot{width:8px;height:8px;border-radius:50%;background:#adb5bd;margin-right:4px}
+#connDot.on{background:#40c057}
+#connDot.off{background:#fa5252}
+
+/* palette */
+#palette{left:12px;top:64px;bottom:12px;width:250px;display:flex;flex-direction:column;min-width:170px;max-width:70vw}
+#palette.collapsed{width:auto!important;bottom:auto}
+#palette.collapsed .pbody,#palette.collapsed .pfoot,#palette.collapsed .presize{display:none}
+#palette .phead{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line)}
+#palette .phead b{flex:1;font-size:13px}
+#palette .phead button{border:none;background:none;padding:2px 6px;border-radius:5px}
+#palette .phead button:hover{background:#f1f3f5}
+#palette .psearch{padding:8px 10px 4px}
+#palette .psearch input{width:100%;border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+#palette .pbody{flex:1;overflow:auto;padding:0 8px 8px}
+#palette .cat{font-size:11px;font-weight:700;color:var(--muted);margin:10px 4px 4px;display:flex;align-items:center;cursor:pointer;user-select:none}
+#palette .cat::before{content:'▾';margin-right:4px;font-size:10px}
+#palette .cat.closed::before{content:'▸'}
+#palette .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--ps,64px),1fr));gap:4px}
+#palette .item{border:1px solid transparent;border-radius:7px;padding:4px 2px;text-align:center;cursor:grab;background:#fff;position:relative;user-select:none}
+#palette .item:hover{border-color:var(--line);background:#f8f9fa}
+#palette .item.on{border-color:var(--accent);background:var(--accent-l)}
+#palette .item svg,#palette .item img{width:calc(var(--ps,64px) - 22px);height:calc(var(--ps,64px) - 22px);display:block;margin:0 auto;object-fit:contain;pointer-events:none}
+#palette .item span{display:block;font-size:10px;line-height:1.2;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#palette .item .del{position:absolute;right:1px;top:1px;border:none;background:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:14px;padding:0;display:none;color:#e03131;box-shadow:0 0 2px rgba(0,0,0,.3)}
+#palette .item:hover .del{display:block}
+#palette .pfoot{border-top:1px solid var(--line);padding:8px 10px;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+#palette .pfoot input[type=range]{flex:1}
+#palette .presize{position:absolute;right:-5px;top:0;bottom:0;width:10px;cursor:ew-resize}
+#palette .presize:hover{background:linear-gradient(90deg,transparent 4px,var(--accent) 4px,var(--accent) 6px,transparent 6px)}
+
+/* properties */
+#props{right:12px;top:64px;width:236px;max-height:calc(100% - 140px);overflow:auto;padding:10px 12px}
+#props.collapsed .pb{display:none}
+#props h4{margin:0;font-size:12px;display:flex;align-items:center;cursor:pointer;user-select:none}
+#props h4 span{flex:1}
+#props .row{margin-top:10px}
+#props .lbl{font-size:11px;color:var(--muted);margin-bottom:4px}
+.sw{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.sw button{width:20px;height:20px;border-radius:5px;border:1px solid rgba(0,0,0,.15);padding:0}
+.sw button.on{outline:2px solid var(--accent);outline-offset:1px}
+.sw button.none{background:linear-gradient(135deg,#fff 45%,#fa5252 45%,#fa5252 55%,#fff 55%)}
+.sw input[type=color]{width:22px;height:22px;border:none;padding:0;background:none;cursor:pointer}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{flex:1;border:none;background:#fff;padding:4px 0;font-size:12px;min-width:26px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent-l);color:var(--accent);font-weight:700}
+#props select,#props input[type=number]{border:1px solid var(--line);border-radius:6px;padding:4px 6px;width:100%}
+.flex{display:flex;gap:6px;align-items:center}
+.minibtns{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.minibtns button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:4px 0;font-size:11px}
+.minibtns button:hover{background:#f1f3f5}
+
+/* zoom */
+#zoomBox{right:12px;bottom:12px;display:flex;align-items:center;padding:4px;gap:2px}
+#zoomBox button{border:none;background:none;border-radius:6px;padding:5px 8px;font-size:13px}
+#zoomBox button:hover{background:#f1f3f5}
+#zoomBox button.on{background:var(--accent-l);color:var(--accent)}
+#zoomPct{min-width:52px;text-align:center}
+#undoBox{left:50%;bottom:12px;transform:translateX(-50%);display:flex;padding:4px;gap:2px}
+#undoBox button{border:none;background:none;border-radius:6px;padding:5px 10px}
+#undoBox button:hover{background:#f1f3f5}
+
+/* text editor */
+#editor{position:absolute;z-index:20;border:none;outline:1.5px dashed var(--accent);background:transparent;resize:none;overflow:hidden;padding:0;margin:0;white-space:pre-wrap;word-break:break-word;line-height:1.3;transform-origin:0 0}
+
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:100;display:flex;align-items:center;justify-content:center}
+.modal .box{background:#fff;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.25);width:min(520px,92vw);max-height:86vh;overflow:auto;padding:20px 22px}
+.modal h3{margin:0 0 14px;font-size:16px}
+.modal .f{margin-bottom:12px}
+.modal .f>label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+.modal input[type=text],.modal select{width:100%;border:1px solid var(--line);border-radius:7px;padding:7px 9px}
+.modal .foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.radios{display:flex;flex-wrap:wrap;gap:6px}
+.radios label{border:1px solid var(--line);border-radius:7px;padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:5px}
+.radios label:has(input:checked){border-color:var(--accent);background:var(--accent-l)}
+.radios input{margin:0}
+.hist{max-height:50vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.hist div{display:flex;align-items:center;padding:7px 10px;border-bottom:1px solid #f1f3f5;gap:8px}
+.hist div:last-child{border:none}
+.hist span{flex:1}
+.hist em{font-style:normal;font-size:11px;color:var(--muted)}
+#toast{position:fixed;left:50%;bottom:64px;transform:translateX(-50%);background:#212529;color:#fff;padding:8px 16px;border-radius:8px;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.show{opacity:.92}
+#ctx{position:fixed;z-index:50;background:#fff;border-radius:8px;box-shadow:var(--shadow);padding:4px;min-width:170px}
+#ctx button{display:flex;width:100%;border:none;background:none;padding:6px 10px;border-radius:5px;text-align:left;justify-content:space-between}
+#ctx button:hover{background:#f1f3f5}
+#ctx button kbd{color:var(--muted);font-family:inherit;font-size:11px}
+#ctx hr{border:none;border-top:1px solid var(--line);margin:3px 0}
+#dropHint{position:absolute;inset:0;border:3px dashed var(--accent);background:rgba(28,126,214,.06);z-index:30;pointer-events:none;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--accent)}
+@media (max-width:900px){#props{width:200px}#boardName{width:130px}}
+</style>
+</head>
+<body>
+
+<!-- ===== ボード一覧 ===== -->
+<div id="home" class="hidden">
+  <div class="wrap">
+    <h1><svg width="28" height="28" viewBox="0 0 32 32"><rect x="2" y="4" width="28" height="22" rx="3" fill="#1c7ed6"/><path d="M8 18l6-6 4 4 6-6" stroke="#fff" stroke-width="3" fill="none"/></svg>ITホワイトボード</h1>
+    <div class="sub">ネットワーク構成・セキュリティ・業務フローを複数人でリアルタイムに描けるホワイトボード</div>
+    <div class="actions">
+      <button class="btn primary" id="newBoard">＋ 新しいボード</button>
+      <button class="btn" id="importBoard">JSONから取り込み</button>
+      <input type="file" id="importFile" accept=".json,application/json" class="hidden">
+    </div>
+    <div id="boardGrid"></div>
+  </div>
+</div>
+
+<!-- ===== ホワイトボード ===== -->
+<div id="app" class="hidden">
+  <div id="stage" class="grid">
+    <svg id="svg" xmlns="http://www.w3.org/2000/svg">
+      <defs id="defs"></defs>
+      <g id="world"><g id="content"></g><g id="overlay"></g></g>
+    </svg>
+    <textarea id="editor" class="hidden" spellcheck="false"></textarea>
+  </div>
+
+  <div id="topLeft" class="float">
+    <button class="home" id="goHome" title="ボード一覧"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <input id="boardName" value="" title="ボード名（クリックで変更）">
+    <span id="saveState">接続中…</span>
+  </div>
+
+  <div id="toolbar" class="float">
+    <button class="tb" data-tool="select" title="選択 (V)"><svg viewBox="0 0 24 24"><path d="M5 3l14 8-6 2-3 6z"/></svg><span class="k">V</span></button>
+    <button class="tb" data-tool="hand" title="移動/パン (H・スペース+ドラッグ)"><svg viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 013 0V12m0-1V4.5a1.5 1.5 0 013 0V12m0-6.5a1.5 1.5 0 013 0V13m0-4.5a1.5 1.5 0 013 0V15a7 7 0 01-7 7h-1a7 7 0 01-6-3.5L4 14a1.6 1.6 0 012.6-1.8L8 14"/></svg><span class="k">H</span></button>
+    <div class="sep"></div>
+    <button class="tb" data-tool="rect" title="四角形 (R)"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/></svg><span class="k">R</span></button>
+    <button class="tb" data-tool="ellipse" title="円 (O)"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8.5" ry="7.5"/></svg><span class="k">O</span></button>
+    <button class="tb" data-tool="diamond" title="ひし形 (D)"><svg viewBox="0 0 24 24"><path d="M12 3l9 9-9 9-9-9z"/></svg><span class="k">D</span></button>
+    <button class="tb" data-tool="arrow" title="矢印・接続線 (A) ※図形やアイコンの上から引くと自動で接続"><svg viewBox="0 0 24 24"><path d="M5 19L19 5M10 5h9v9"/></svg><span class="k">A</span></button>
+    <button class="tb" data-tool="line" title="線 (L)"><svg viewBox="0 0 24 24"><path d="M5 19L19 5"/></svg><span class="k">L</span></button>
+    <button class="tb" data-tool="pen" title="ペン (P)"><svg viewBox="0 0 24 24"><path d="M4 20c3-1 4-6 7-6s2 4 5 4 3-3 4-5M15 4l5 5"/></svg><span class="k">P</span></button>
+    <button class="tb" data-tool="text" title="テキスト (T)"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><span class="k">T</span></button>
+    <button class="tb" data-tool="sticky" title="付箋 (S)"><svg viewBox="0 0 24 24"><path d="M4 4h16v11l-5 5H4z M15 20v-5h5"/></svg><span class="k">S</span></button>
+    <button class="tb" data-tool="frame" title="フレーム (F) ※エクスポート時に1スライド＝1フレーム"><svg viewBox="0 0 24 24"><path d="M7 3v18M17 3v18M3 7h18M3 17h18"/></svg><span class="k">F</span></button>
+    <button class="tb" data-tool="eraser" title="消しゴム (E)"><svg viewBox="0 0 24 24"><path d="M8 20h12M5 15l9-9 5 5-9 9H8z M10 10l5 5"/></svg><span class="k">E</span></button>
+    <div class="sep"></div>
+    <button class="tb" id="imgBtn" title="画像を挿入"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg></button>
+    <input type="file" id="imgFile" accept="image/*" class="hidden" multiple>
+  </div>
+
+  <div id="topRight" class="float">
+    <span id="connDot" title="接続状態"></span>
+    <div id="peers"></div>
+    <div class="sep" style="height:24px"></div>
+    <button class="btn sm" id="shareBtn" title="URLをコピー">共有</button>
+    <button class="btn sm" id="histBtn" title="自動保存された履歴">履歴</button>
+    <button class="btn sm primary" id="exportBtn">エクスポート</button>
+  </div>
+
+  <div id="palette" class="float">
+    <div class="phead"><b>アイコン</b><button id="palUpload" title="自分の画像をアイコンとして登録">＋登録</button><button id="palToggle" title="折りたたむ">≪</button></div>
+    <input type="file" id="palFile" accept="image/*" class="hidden" multiple>
+    <div class="psearch"><input id="palSearch" placeholder="検索（例: ルーター, メール, virus）"></div>
+    <div class="pbody" id="palBody"></div>
+    <div class="pfoot">小<input type="range" id="palSize" min="44" max="130" value="64">大</div>
+    <div class="presize" id="palResize" title="ドラッグでパレット幅を変更"></div>
+  </div>
+
+  <div id="props" class="float">
+    <h4 id="propsHead"><span id="propsTitle">スタイル</span><small>▾</small></h4>
+    <div class="pb" id="propsBody"></div>
+  </div>
+
+  <div id="undoBox" class="float">
+    <button id="undoBtn" title="元に戻す (Ctrl+Z)">↶ 戻す</button>
+    <button id="redoBtn" title="やり直し (Ctrl+Shift+Z)">↷ やり直し</button>
+  </div>
+
+  <div id="zoomBox" class="float">
+    <button id="gridBtn" class="on" title="グリッド表示・スナップ">▦</button>
+    <button id="zoomOut" title="縮小 (-)">－</button>
+    <button id="zoomPct" title="100%に戻す (Ctrl+0)">100%</button>
+    <button id="zoomIn" title="拡大 (+)">＋</button>
+    <button id="zoomFit" title="全体を表示 (Shift+1)">全体</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="icons.js"></script>
+<script src="vendor/pptxgen.bundle.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
